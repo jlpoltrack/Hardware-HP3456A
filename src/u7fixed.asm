@@ -1175,11 +1175,13 @@ LA522:
 	rts
 
 ;===============================================================================
-; FIX: Z clear (bne) if the 7th digit should be shown: 7-digit mode, no number
-; being entered (flagCmdParse bit0), and 10 or 100 PLC. Destroys A.
+; FIX: Z clear (bne) if the 7th digit should be shown: 7-digit mode, a fresh reading
+; (Digit7 valid), no number being entered (flagCmdParse bit0), and 10 or 100 PLC. Destroys A.
 sub7thDigitShown:
 	ldaa	flag7Digits
 	beq	L7THX		; not in 7 digit mode (A = 0, Z set)
+	ldaa	Digit7
+	bmi	L7THN		; FIX: recalled value, no 7th digit (set in sub023)
 	ldaa	#$01
 	anda	flagCmdParse
 	bne	L7THN		; number entry in progress
@@ -2417,6 +2419,12 @@ LADED:
 ; calling routine sets X0790 (register offset) and X0791 (possible values 0D,20,2A,2C)
 ; used when meter is in Auto range
 sub023:
+	ldaa	#$20		; FIX: X0791 bit5 = register or stored value, not a fresh
+	anda	X0791		; reading, so it has no 7th digit: mark Digit7 invalid ($FF)
+	beq	L023R
+	ldaa	#$FF
+	staa	Digit7
+L023R:
 	ldaa	#$02
 	staa	x01B0	; loop index 2,4,6,8
 LADF5:
@@ -5333,6 +5341,8 @@ LC2BE:
 	jsr	sub7thDigitShown	; FIX: was ldaa flag7Digits
 	beq	LC2BF		; branch if no
 	ldaa	Digit7
+	cmpa	#$09		; FIX: send only a digit, not a display code (dash, blank)
+	bhi	LC2BF
 	adda	#$30		; convert to ASCII
 	staa	ioHPIB_r7	; slip 7th digit into output
 	bsr	subWaitForHPIB_Idle
