@@ -138,7 +138,15 @@ a decimal point, `E`, exponent sign, one exponent digit.
 
 In 7-digit mode (`7STG` at 10 or 100 PLC), the 7th digit is appended to the mantissa:
 `+1.2345678E+0`. It is left out at 1 PLC or less, while a number is being entered, and in packed
-output. HP-IB output of the 7th digit has not been tested on hardware yet.
+output.
+
+Seen on hardware on 2026-11-14: readings at 10 and 100 PLC carry the 7th digit
+(`-09.524798E+0`), and at 1 PLC it is dropped.
+
+Recalled values (`RE<reg>`, statistics `C`/`M`/`V`, stored readings) hold only 6.5 digits, so
+they are sent without a 7th digit: `7.25STY REY` gives `+07.25000E+0`. Builds before this fix
+sent a stale 7th digit instead, e.g. `+07.25000:E+0`. The fix is built but **not yet tested on
+hardware**.
 
 Packed output (`P1`) sends 3–4 bytes of BCD per reading.
 

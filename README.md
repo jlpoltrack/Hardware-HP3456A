@@ -9,8 +9,10 @@ freeze**. This build fixes all seven, keeps the 7.5-digit feature, and tightens 
 digit appears.
 
 **Status:** tested on a real meter on 2026-10-19. All front-panel tests pass; see
-[`docs/HARDWARE_VALIDATION.md`](docs/HARDWARE_VALIDATION.md). HPIB output of the 7th digit
-has not been tested on hardware yet.
+[`docs/HARDWARE_VALIDATION.md`](docs/HARDWARE_VALIDATION.md). On 2026-11-14 HPIB readings
+carried the 7th digit correctly, but a recalled register came back with a bad 7th digit
+(see [the 7.5-digit feature bug](#bug-in-the-75-digit-feature)). The current source fixes that;
+this build has **not yet been tested on hardware**.
 
 ## What you get
 
@@ -25,7 +27,8 @@ Set 10 or 100 PLC, then enter `7` for digits displayed. The 7th digit is hidden,
 behaves as a stock 6.5-digit unit, when:
 
 - PLC is 1 or lower (the extra digit would only be noise);
-- a number is being entered on the keypad or over HPIB.
+- a number is being entered on the keypad or over HPIB;
+- the value is a recalled register or stored reading, which only holds 6.5 digits.
 
 ### Reading the display
 
@@ -60,7 +63,20 @@ and is tagged `FIX:` in [`src/u7fixed.asm`](src/u7fixed.asm).
 | Digits-displayed entry (LE1DE) | `jsr subDisplayError4` dropped | Entering 2 or 8 is silently ignored instead of showing E4 |
 
 The 7th-digit display and HPIB output now go through one routine, `sub7thDigitShown`, which
-applies the PLC and number-entry rules above.
+applies the PLC, number-entry and recalled-value rules above.
+
+### Bug in the 7.5-digit feature
+
+This one is in the mod's own design, not a restructuring slip, so the factory ROM has no
+equivalent. It is also tagged `FIX:`.
+
+| Where | Bug | Effect before the fix |
+| --- | --- | --- |
+| `sub023`, `sub7thDigitShown`, `subHPIBOutputReadingUnpacked` | The 7th digit is saved only when a reading is formatted, but every value shown or sent appends it. Register recalls, statistics and stored readings (RER) have no 7th digit, so they got a stale one: the last reading's, or `$0A` left by the dashes shown after a command (`sub026`) | In 7-digit mode `REY` sent `+07.25000:E+0` over HPIB (`:` is digit value 10), and the front panel showed a dash or stale digit in place of the register's exponent. Overload readings could also send `?` or `O` as a 7th character |
+
+`sub023` now marks the 7th digit invalid when it formats a value that is not a fresh reading
+(X0791 bit5), `sub7thDigitShown` hides an invalid digit, and HPIB output sends the 7th digit
+only if it is 0–9.
 
 ## Build
 
@@ -77,7 +93,8 @@ chip, tile it so the image works whatever the unused upper address lines are tie
 python3 tools/replicate.py build/u7fixed.bin build/u7fixed_512K.bin 512K
 ```
 
-Expected hashes for the tested build are listed in `docs/HARDWARE_VALIDATION.md`.
+Expected hashes for the hardware-tested build and the current build are listed in
+`docs/HARDWARE_VALIDATION.md`.
 
 ## Install
 
@@ -95,11 +112,11 @@ Before you install:
 
 ## ROM space
 
-About 950 bytes are free for future changes:
+About 930 bytes are free for future changes:
 
 | Range | Bytes | Notes |
 | --- | --- | --- |
-| $F33E–$F65A | 797 | Directly after the code |
+| $F352–$F65A | 777 | Directly after the code |
 | $FF56–$FFEF | 154 | Below the interrupt vectors |
 | $8000–$9FFF | 8192 | Never used by the factory ROM; whether the board maps it to U7 is unverified |
 
@@ -117,7 +134,7 @@ Contributions welcome. Sizes are rough estimates.
 | Min/max hold | ~100 B | Track the extremes, viewable with RECALL L / U |
 | Pt100 RTD temperature | ~300–400 B | 4-wire ohms to °C (Callendar–Van Dusen), using the ROM's BCD maths |
 
-The first three fit together in the 154-byte block below the vectors, leaving the 797-byte
+The first three fit together in the 154-byte block below the vectors, leaving the 777-byte
 block for one larger feature.
 
 To try out code in $8000–$9FFF, a [One ROM](https://onerom.org/) Fire 28 in place of the flash
@@ -131,6 +148,7 @@ chip makes testing and rollback fast. See the end of `docs/HARDWARE_VALIDATION.m
 | `src/u7modded.asm` | The published mod's source, recovered from its listing (the zip has no `.asm`); reassembles byte-identical to `u7modded.bin` |
 | `tools/as02.py` | 6800 assembler for the AS02 subset used here, with branch relaxation |
 | `tools/compare.py` | Lockstep semantic diff of two ROMs: `compare.py orig.bin new.bin new.lst`. Run it against the factory `u7.bin` |
+| `tools/lstdiff.py` | Explains every byte change between two builds: `lstdiff.py old.lst old.bin new.lst new.bin` |
 | `tools/dis.py` | Linear 6800 disassembler: `dis.py rom.bin start end` |
 | `tools/replicate.py` | Tiles an image to fill a larger chip |
 | `tools/lst2asm.py` | Recovers source from an AS02 listing |

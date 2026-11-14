@@ -8,10 +8,20 @@ the factory ROM, with nothing run on hardware.
 
 ## Image under test
 
+Tested build (2026-10-19, tests 1–14 below):
+
 | File | Size | SHA-256 |
 | --- | --- | --- |
 | `build/u7fixed.bin` | 32 KB | `bd916a6a89d88957d149342c0e2c780357c24a25a2ed46e1d09dea345f8a4760` |
 | `build/u7fixed_512K.bin` | 512 KB (32 KB x 16) | `10636abae76d22c4b8c99faf99a788bb658c748959798ead6f47c20e80f5e0a5` |
+
+Current build, with the 7th-digit register-recall fix. **Not yet tested on hardware:** run test 16,
+then repeat 5–8 and 15.
+
+| File | Size | SHA-256 |
+| --- | --- | --- |
+| `build/u7fixed.bin` | 32 KB | `f60d56a0c0ace0e9c810c9c8de1276ad11a8510da48982b4d804339d3a21b4ca` |
+| `build/u7fixed_512K.bin` | 512 KB (32 KB x 16) | `fa37fd00587e1183c83ccd898402a2b76be5b667977effd7b8e012cae343b8b2` |
 
 Burn the 512 KB file. If the source changes, rebuild and update these hashes (commands in
 `README.md`).
@@ -60,6 +70,7 @@ Run them in order, and stop at the first failure. Record what you see in the Res
 | 13 | Limit U | Recall the U register after power-on | Shows +1.999999E9 | Fix: U exponent |
 | 14 | Store D | Store a valid delay value in D | Accepted, no error | Fix: register D path |
 | 15 | HPIB 7 digits (optional) | 7-digit mode at 10 PLC; read over HPIB in unpacked format | Reading carries the 7th digit | 7.5-digit mod |
+| 16 | HPIB register recall | Over HPIB: `10STI7STG`, `7.25STY`, `REY`; then take a reading | `REY` gives `+07.25000E+0` (no 7th digit); the reading still has 7 digits. On the front panel, RECALL Y shows 7.25 with its normal exponent | Fix: 7th digit on recalled values |
 
 ## Results log
 
@@ -79,7 +90,8 @@ Run them in order, and stop at the first failure. Record what you see in the Res
 | 12 | Pass | R recalls 600. |
 | 13 | Pass | U recalls +1.999999E9. |
 | 14 | Pass | D = 1 accepted, no error; readings slow to ~1/s. |
-| 15 | Skipped | Meter has no HPIB interface. |
+| 15 | Skipped | Meter has no HPIB interface. 2026-11-14, over HPIB with the tested build: readings `-09.524798E+0` at 10/100 PLC, 7th digit dropped at 1 PLC. Found the register-recall bug fixed by test 16 (`REY` gave `+07.25000:E+0`). |
+| 16 | Not yet run | New build only. |
 
 ## If something fails
 
